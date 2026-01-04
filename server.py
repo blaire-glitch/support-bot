@@ -1,13 +1,20 @@
 """FastAPI web server for the Support Bot."""
 
 import os
+from pathlib import Path
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Get the directory where server.py is located
+BASE_DIR = Path(__file__).resolve().parent
+STATIC_DIR = BASE_DIR / "static"
 
 # Global bot instance
 bot = None
@@ -39,6 +46,22 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Serve Web UI
+@app.get("/ui")
+async def serve_ui():
+    """Serve the web interface."""
+    return FileResponse(STATIC_DIR / "index.html")
+
+
+@app.get("/ui/{path:path}")
+async def serve_static(path: str):
+    """Serve static files."""
+    file_path = STATIC_DIR / path
+    if file_path.exists():
+        return FileResponse(file_path)
+    return FileResponse(STATIC_DIR / "index.html")
 
 
 class ChatRequest(BaseModel):
