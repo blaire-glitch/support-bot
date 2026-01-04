@@ -70,13 +70,13 @@ def send_email(
 
 def read_emails(
     count: Annotated[int, Field(description="Number of recent emails to read")] = 5,
-    folder: Annotated[str, Field(description="Email folder to read from")] = "INBOX",
+    folder: Annotated[str, Field(description="Email folder: INBOX, SPAM, TRASH, SENT, DRAFTS, or STARRED")] = "INBOX",
 ) -> str:
     """Read recent emails from the specified folder.
     
     Args:
         count: Number of emails to retrieve (default: 5)
-        folder: The folder to read from (default: INBOX)
+        folder: The folder to read from. Options: INBOX, SPAM, TRASH, SENT, DRAFTS, STARRED
         
     Returns:
         A formatted list of recent emails
@@ -88,11 +88,23 @@ def read_emails(
     if not email_address or not email_password:
         return "Error: Email credentials not configured. Please set EMAIL_ADDRESS and EMAIL_PASSWORD in .env file."
     
+    # Map common folder names to Gmail folder names
+    folder_map = {
+        "SPAM": "[Gmail]/Spam",
+        "TRASH": "[Gmail]/Trash", 
+        "SENT": "[Gmail]/Sent Mail",
+        "DRAFTS": "[Gmail]/Drafts",
+        "STARRED": "[Gmail]/Starred",
+        "ALL": "[Gmail]/All Mail",
+        "IMPORTANT": "[Gmail]/Important",
+    }
+    gmail_folder = folder_map.get(folder.upper(), folder)
+    
     try:
         # Connect to IMAP server
         mail = imaplib.IMAP4_SSL(imap_server)
         mail.login(email_address, email_password)
-        mail.select(folder)
+        mail.select(gmail_folder)
         
         # Search for all emails
         _, message_numbers = mail.search(None, "ALL")
