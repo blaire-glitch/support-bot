@@ -6,6 +6,7 @@ A floating desktop assistant you can chat with anytime.
 import os
 import sys
 import threading
+import asyncio
 import json
 import tkinter as tk
 from tkinter import ttk, scrolledtext
@@ -32,6 +33,7 @@ class AvatarWindow:
         # Window state
         self.expanded = False
         self.drag_data = {"x": 0, "y": 0}
+        self.is_dragging = False
         
         # Colors
         self.bg_color = "#1a1a2e"
@@ -87,9 +89,9 @@ class AvatarWindow:
             cursor="hand2"
         )
         self.avatar_btn.pack(side=tk.LEFT, padx=5, pady=5)
-        self.avatar_btn.bind("<Button-1>", self.toggle_chat)
-        self.avatar_btn.bind("<B1-Motion>", self.drag_window)
         self.avatar_btn.bind("<ButtonPress-1>", self.start_drag)
+        self.avatar_btn.bind("<B1-Motion>", self.drag_window)
+        self.avatar_btn.bind("<ButtonRelease-1>", self.on_click_release)
         
         # Status and title (collapsed view)
         self.header_info = tk.Frame(self.avatar_frame, bg=self.bg_color)
@@ -151,19 +153,67 @@ class AvatarWindow:
         self.chat_display.tag_configure("bot", foreground="#4ade80", font=("Segoe UI", 10, "bold"))
         self.chat_display.tag_configure("message", foreground=self.text_color)
         
-        # Quick action buttons
-        self.quick_frame = tk.Frame(self.chat_frame, bg=self.bg_color)
-        self.quick_frame.pack(fill=tk.X, padx=10, pady=5)
+        # Quick action buttons - Row 1 (Email)
+        self.quick_frame1 = tk.Frame(self.chat_frame, bg=self.bg_color)
+        self.quick_frame1.pack(fill=tk.X, padx=10, pady=(5, 2))
         
-        quick_actions = [
+        quick_actions_email = [
             ("📧 Emails", "How many unread emails?"),
             ("📬 Read", "Read latest 3 emails"),
-            ("🚫 Spam", "Check spam folder"),
         ]
         
-        for text, cmd in quick_actions:
+        for text, cmd in quick_actions_email:
             btn = tk.Button(
-                self.quick_frame,
+                self.quick_frame1,
+                text=text,
+                font=("Segoe UI", 9),
+                bg=self.input_bg,
+                fg=self.text_color,
+                activebackground=self.accent_color,
+                activeforeground=self.text_color,
+                relief=tk.FLAT,
+                cursor="hand2",
+                command=lambda c=cmd: self.send_quick(c)
+            )
+            btn.pack(side=tk.LEFT, padx=2)
+        
+        # Quick action buttons - Row 2 (Desktop)
+        self.quick_frame2 = tk.Frame(self.chat_frame, bg=self.bg_color)
+        self.quick_frame2.pack(fill=tk.X, padx=10, pady=(0, 2))
+        
+        quick_actions_desktop = [
+            ("📸 Screenshot", "Take a screenshot"),
+            ("💻 System", "Get system info"),
+            ("🔋 Battery", "Check battery status"),
+        ]
+        
+        for text, cmd in quick_actions_desktop:
+            btn = tk.Button(
+                self.quick_frame2,
+                text=text,
+                font=("Segoe UI", 9),
+                bg=self.input_bg,
+                fg=self.text_color,
+                activebackground=self.accent_color,
+                activeforeground=self.text_color,
+                relief=tk.FLAT,
+                cursor="hand2",
+                command=lambda c=cmd: self.send_quick(c)
+            )
+            btn.pack(side=tk.LEFT, padx=2)
+        
+        # Quick action buttons - Row 3 (File Organization)
+        self.quick_frame3 = tk.Frame(self.chat_frame, bg=self.bg_color)
+        self.quick_frame3.pack(fill=tk.X, padx=10, pady=(0, 5))
+        
+        quick_actions_files = [
+            ("📂 Organize", "Preview organizing my Downloads folder"),
+            ("📊 Stats", "Get folder stats for Downloads"),
+        ]
+        
+        for text, cmd in quick_actions_files:
+            btn = tk.Button(
+                self.quick_frame3,
                 text=text,
                 font=("Segoe UI", 9),
                 bg=self.input_bg,
@@ -207,7 +257,7 @@ class AvatarWindow:
         self.send_btn.pack(side=tk.RIGHT)
         
         # Add welcome message
-        self.add_message("Bot", "👋 Hi! Click me to chat. I can help with emails, WhatsApp & LinkedIn!")
+        self.add_message("Bot", "👋 Hi! I can help with emails, WhatsApp, LinkedIn, and automate your desktop! Try: 'open chrome', 'take screenshot', 'what apps are running?'")
         
     def position_window(self):
         """Position window in bottom-right corner."""
@@ -222,12 +272,24 @@ class AvatarWindow:
         """Start dragging the window."""
         self.drag_data["x"] = event.x
         self.drag_data["y"] = event.y
+        self.is_dragging = False
         
     def drag_window(self, event):
         """Drag the window."""
+        # Check if we've moved enough to consider it a drag
+        dx = abs(event.x - self.drag_data["x"])
+        dy = abs(event.y - self.drag_data["y"])
+        if dx > 5 or dy > 5:
+            self.is_dragging = True
+        
         x = self.root.winfo_x() + (event.x - self.drag_data["x"])
         y = self.root.winfo_y() + (event.y - self.drag_data["y"])
         self.root.geometry(f"+{x}+{y}")
+        
+    def on_click_release(self, event):
+        """Handle click release - toggle chat only if not dragging."""
+        if not self.is_dragging:
+            self.toggle_chat()
         
     def toggle_chat(self, event=None):
         """Toggle between avatar and full chat view."""
@@ -285,7 +347,9 @@ class AvatarWindow:
         # Process in background
         def process():
             try:
-                response = self.bot.run(message)
+                # Run the async bot.run() method properly
+                result = asyncio.run(self.bot.run(message))
+                response = result.text  # Extract the text from AgentRunResponse
                 # Remove "Thinking..." and add real response
                 self.root.after(0, lambda: self.update_last_message(response))
             except Exception as e:
