@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: support-bot
+    runtime: python
+    buildCommand: pip install -r requirements.txt --pre
+    startCommand: python server.py
+    envVars:
+      - key: GITHUB_TOKEN
+        sync: false
+      - key: EMAIL_ADDRESS
+        sync: false
+      - key: EMAIL_PASSWORD
+        sync: false
+      - key: WHATSAPP_PHONE_NUMBER_ID
+        sync: false
+      - key: WHATSAPP_ACCESS_TOKEN
+        sync: false
+      - key: LINKEDIN_ACCESS_TOKEN
+        sync: false
+    healthCheckPath: /health
